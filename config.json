@@ -1,0 +1,13 @@
+{
+    "token": "TOKENİNİZİ GİRİN",
+    "durum": "Arka bahçenden seni",
+    "limit": {
+        "delete_channels": 3,
+        "create_roles": 4,
+        "delete_roles": 4,
+        "send_everyone": 3,
+        "create_channels": 5,
+        "ban_members": 4,
+        "kick_members": 5
+      }
+}
