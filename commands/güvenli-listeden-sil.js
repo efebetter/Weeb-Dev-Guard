@@ -50,4 +50,10 @@ module.exports = {
             const userRemoved = new Discord.EmbedBuilder()
                 .setColor("Green")
                 .setTitle("Safe User Removed!")
-                .setDescription(`The user **${user.tag}** has been removed from the safe lis
+                .setDescription(`The user **${user.tag}** has been removed from the safe list.`);
+            return interaction.reply({ embeds: [userRemoved] });
+        }
+
+        interaction.reply({ content: "Please select either a role or a user.", ephemeral: true });
+    }
+}
