@@ -1,19 +1,19 @@
 const db = require('croxydb');
 
 module.exports = {
-    name: 'af',
-    description: 'Belirli bir kullanıcının limit verilerini sıfırlar.',
+    name: 'reset-limits',
+    description: 'Resets the limit data for a specific user.',
     type: 1,
     options: [
         {
-            name: 'kullanıcı',
-            description: 'Limitlerini sıfırlamak istediğiniz kullanıcının IDsi',
-            type: 6, 
+            name: 'user',
+            description: 'The ID of the user whose limits you want to reset.',
+            type: 6,
             required: true
         }
     ],
     run: async (client, interaction) => {
-        const userId = interaction.options.getUser('kullanıcı').id;
+        const userId = interaction.options.getUser('user').id;
         const guildId = interaction.guild.id;
 
         db.delete(`everyone_atma_${guildId}_${userId}`);
@@ -29,6 +29,6 @@ module.exports = {
         db.delete(`üye_atma_${guildId}_${userId}`);
         db.delete(`kick_members_${guildId}_${userId}`);
 
-        await interaction.reply(`Kullanıcı (${userId}) için limit verileri başarıyla sıfırlandı.`);
+        await interaction.reply(`Limit data for the user (${userId}) has been successfully reset.`);
     },
 };
