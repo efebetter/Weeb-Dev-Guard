@@ -2,58 +2,52 @@ const Discord = require("discord.js");
 const db = require("croxydb");
 
 module.exports = {
-    name: "güvenli-listeden-sil",
-    description: "Güvenli listeden rol veya kullanıcı silin!",
+    name: "remove-from-safe",
+    description: "Remove a role or user from the safe list!",
     type: 1,
     options: [
         {
-            name: "rol",
-            description: "Güvenli listeden silinecek rol",
+            name: "role",
+            description: "The role to remove from the safe list",
             type: 8, // Role type
             required: false
         },
         {
-            name: "kullanıcı",
-            description: "Güvenli listeden silinecek kullanıcı",
+            name: "user",
+            description: "The user to remove from the safe list",
             type: 6, // User type
             required: false
         }
     ],
     run: async (client, interaction) => {
-        const yetki = new Discord.EmbedBuilder()
+        const noPermission = new Discord.EmbedBuilder()
             .setColor("Red")
-            .setTitle("Yetersiz Yetki!")
-            .setDescription("> Bu komutu kullanabilmek için `Sunucu Sahibi` olmalısın!");
+            .setTitle("Insufficient Permission!")
+            .setDescription("> You must be the **Server Owner** to use this command!");
 
         if (interaction.guild.ownerId !== interaction.user.id) {
-            return interaction.reply({ embeds: [yetki], ephemeral: true });
+            return interaction.reply({ embeds: [noPermission], ephemeral: true });
         }
 
-        const rol = interaction.options.getRole("rol");
-        const kullanıcı = interaction.options.getUser("kullanıcı");
+        const role = interaction.options.getRole("role");
+        const user = interaction.options.getUser("user");
 
-        if (rol) {
-            let güvenliRoller = db.get(`güvenli_roller_${interaction.guild.id}`) || [];
-            güvenliRoller = güvenliRoller.filter(rolId => rolId !== rol.id);
-            db.set(`güvenli_roller_${interaction.guild.id}`, güvenliRoller);
-            const rolSil = new Discord.EmbedBuilder()
+        if (role) {
+            let safeRoles = db.get(`safe_roles_${interaction.guild.id}`) || [];
+            safeRoles = safeRoles.filter(roleId => roleId !== role.id);
+            db.set(`safe_roles_${interaction.guild.id}`, safeRoles);
+            const roleRemoved = new Discord.EmbedBuilder()
                 .setColor("Green")
-                .setTitle("Güvenli Rol Silindi!")
-                .setDescription(`${rol.name} rolü güvenli listeden çıkarıldı.`);
-            return interaction.reply({ embeds: [rolSil] });
+                .setTitle("Safe Role Removed!")
+                .setDescription(`The role **${role.name}** has been removed from the safe list.`);
+            return interaction.reply({ embeds: [roleRemoved] });
         }
 
-        if (kullanıcı) {
-            let güvenliKullanıcılar = db.get(`güvenli_kullanıcılar_${interaction.guild.id}`) || [];
-            güvenliKullanıcılar = güvenliKullanıcılar.filter(kullanıcıId => kullanıcıId !== kullanıcı.id);
-            db.set(`güvenli_kullanıcılar_${interaction.guild.id}`, güvenliKullanıcılar);
-            const kullanıcıSil = new Discord.EmbedBuilder()
+        if (user) {
+            let safeUsers = db.get(`safe_users_${interaction.guild.id}`) || [];
+            safeUsers = safeUsers.filter(userId => userId !== user.id);
+            db.set(`safe_users_${interaction.guild.id}`, safeUsers);
+            const userRemoved = new Discord.EmbedBuilder()
                 .setColor("Green")
-                .setTitle("Güvenli Kullanıcı Silindi!")
-                .setDescription(`${kullanıcı.tag} kullanıcısı güvenli listeden çıkarıldı.`);
-            return interaction.reply({ embeds: [kullanıcıSil] });
-        }
-
-        interaction.reply("Lütfen bir rol veya kullanıcı seçin.", { ephemeral: true });
-    }
-}
+                .setTitle("Safe User Removed!")
+                .setDescription(`The user **${user.tag}** has been removed from the safe lis
