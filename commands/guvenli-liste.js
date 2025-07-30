@@ -2,33 +2,33 @@ const Discord = require("discord.js");
 const db = require("croxydb");
 
 module.exports = {
-    name: "güvenli-liste",
-    description: "Güvenli listeyi görüntüle!",
+    name: "safe-list",
+    description: "View the safe list!",
     type: 1,
     run: async (client, interaction) => {
-        const yetki = new Discord.EmbedBuilder()
+        const noPermission = new Discord.EmbedBuilder()
             .setColor("Red")
-            .setTitle("Yetersiz Yetki!")
-            .setDescription("> Bu komutu kullanabilmek için `Sunucu Sahibi` olmalısın!");
+            .setTitle("Insufficient Permission!")
+            .setDescription("> You must be the **Server Owner** to use this command!");
 
         if (interaction.guild.ownerId !== interaction.user.id) {
-            return interaction.reply({ embeds: [yetki], ephemeral: true });
+            return interaction.reply({ embeds: [noPermission], ephemeral: true });
         }
 
-        const güvenliRoller = db.get(`güvenli_roller_${interaction.guild.id}`) || [];
-        const güvenliKullanıcılar = db.get(`güvenli_kullanıcılar_${interaction.guild.id}`) || [];
+        const safeRoles = db.get(`güvenli_roller_${interaction.guild.id}`) || [];
+        const safeUsers = db.get(`güvenli_kullanıcılar_${interaction.guild.id}`) || [];
 
-        const rollerListesi = güvenliRoller.map(rolId => `<@&${rolId}>`).join(", ") || "Yok";
-        const kullanıcılarListesi = güvenliKullanıcılar.map(kullanıcıId => `<@${kullanıcıId}>`).join(", ") || "Yok";
+        const rolesList = safeRoles.map(roleId => `<@&${roleId}>`).join(", ") || "None";
+        const usersList = safeUsers.map(userId => `<@${userId}>`).join(", ") || "None";
 
-        const listeEmbed = new Discord.EmbedBuilder()
+        const listEmbed = new Discord.EmbedBuilder()
             .setColor("Blue")
-            .setTitle("Güvenli Liste")
+            .setTitle("Safe List")
             .addFields(
-                { name: "Güvenli Roller", value: rollerListesi },
-                { name: "Güvenli Kullanıcılar", value: kullanıcılarListesi }
+                { name: "Safe Roles", value: rolesList },
+                { name: "Safe Users", value: usersList }
             );
 
-        interaction.reply({ embeds: [listeEmbed] });
+        interaction.reply({ embeds: [listEmbed] });
     }
 }
