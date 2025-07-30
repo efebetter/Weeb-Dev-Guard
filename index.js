@@ -1,11 +1,20 @@
 const Discord = require("discord.js");
 const fs = require("fs");
-const db = require('croxydb');
+const db = require("croxydb");
 const config = require("./config.json");
 
 const { REST } = require("@discordjs/rest");
 const { Routes } = require("discord-api-types/v10");
-const { GatewayIntentBits, Partials, AuditLogEvent, Client, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const {
+    GatewayIntentBits,
+    Partials,
+    AuditLogEvent,
+    Client,
+    EmbedBuilder,
+    ActionRowBuilder,
+    ButtonBuilder,
+    ButtonStyle
+} = require("discord.js");
 
 const client = new Client({
     intents: [
@@ -40,12 +49,12 @@ const client = new Client({
 global.client = client;
 client.commands = (global.commands = []);
 
-console.log(`[-] ${fs.readdirSync("./commands").length} komut algılandı.`)
+console.log(`[-] Detected ${fs.readdirSync("./commands").length} commands.`);
 
-for(let commandName of fs.readdirSync("./commands")) {
-    if(!commandName.endsWith(".js")) continue;
+for (let commandName of fs.readdirSync("./commands")) {
+    if (!commandName.endsWith(".js")) continue;
 
-    const command = require(`./commands/${commandName}`);    
+    const command = require(`./commands/${commandName}`);
     client.commands.push({
         name: command.name.toLowerCase(),
         description: command.description.toLowerCase(),
@@ -54,35 +63,32 @@ for(let commandName of fs.readdirSync("./commands")) {
         type: 1
     });
 
-    console.log(`[+] ${commandName} komutu başarıyla yüklendi.`)
+    console.log(`[+] ${commandName} loaded successfully.`);
 }
 
-console.log(`[-] ${fs.readdirSync("./events").length} olay algılandı.`)
+console.log(`[-] Detected ${fs.readdirSync("./events").length} events.`);
 
-for(let eventName of fs.readdirSync("./events")) {
-    if(!eventName.endsWith(".js")) continue;
+for (let eventName of fs.readdirSync("./events")) {
+    if (!eventName.endsWith(".js")) continue;
 
-    const event = require(`./events/${eventName}`);    
-    const event_name = eventName.split(".")[0];
-
+    const event = require(`./events/${eventName}`);
     client.on(event.name, (...args) => {
-        event.run(client, ...args)
+        event.run(client, ...args);
     });
 
-    console.log(`[+] ${eventName} olayı başarıyla yüklendi.`)
+    console.log(`[+] ${eventName} event loaded successfully.`);
 }
 
 function addToWhitelist(guildId, userId) {
-    const whitelist = db.get(`güvenli_kullanıcılar_${guildId}`) || [];
+    const whitelist = db.get(`safe_users_${guildId}`) || [];
     if (!whitelist.includes(userId)) {
         whitelist.push(userId);
-        db.set(`güvenli_kullanıcılar_${guildId}`, whitelist);
+        db.set(`safe_users_${guildId}`, whitelist);
     }
 }
 
 async function handleGuardEvent(guild, auditLogsPromise, dbKey, limitKey, reason) {
     const guardLimits = config.limit;
-
     if (!db.has(`guard_${guild.id}`)) return;
 
     try {
@@ -93,7 +99,7 @@ async function handleGuardEvent(guild, auditLogsPromise, dbKey, limitKey, reason
         const user = entry.executor;
         const userActions = db.get(`${dbKey}_${guild.id}_${user.id}`) || { count: 0, timestamp: Date.now() };
         const currentTime = Date.now();
-        
+
         if (currentTime - userActions.timestamp > 60000) {
             db.set(`${dbKey}_${guild.id}_${user.id}`, { count: 1, timestamp: currentTime });
         } else {
@@ -103,72 +109,86 @@ async function handleGuardEvent(guild, auditLogsPromise, dbKey, limitKey, reason
 
         const limit = guardLimits[limitKey];
 
-        console.log(`Kullanıcı eylemi: ${userActions.count}, Limit: ${limit}`);
+        console.log(`User action: ${userActions.count}, Limit: ${limit}`);
 
         if (userActions.count >= limit) {
-            console.log("Limit aşıldı. Kullanıcı yasaklanıyor.");
-            
+            console.log("Limit exceeded. Banning user...");
+
             try {
                 await guild.members.ban(user.id, { reason: reason });
-                console.log(`Kullanıcı ${user.id} başarıyla yasaklandı.`);
+                console.log(`User ${user.id} was successfully banned.`);
             } catch (error) {
-                console.error(`Kullanıcı ${user.id} yasaklanamadı: ${error}`);
+                console.error(`Failed to ban user ${user.id}: ${error}`);
             }
 
             const embed = new EmbedBuilder()
                 .setColor("Red")
-                .setTitle("Guard Sistemi Uyarısı")
-                .setDescription(`${user.tag}, ${reason} nedeniyle sunucudan yasaklandı.`);
+                .setTitle("Guard System Warning")
+                .setDescription(`${user.tag} has been banned for: ${reason}.`);
 
             try {
                 const owner = await guild.fetchOwner();
                 await owner.send({ embeds: [embed] });
             } catch (error) {
-                console.error(`Sunucu sahibine mesaj gönderilemedi: ${error}`);
+                console.error(`Could not send message to server owner: ${error}`);
             }
 
             db.delete(`${dbKey}_${guild.id}_${user.id}`);
         }
     } catch (error) {
-        console.error(`Guard işlemi sırasında hata oluştu: ${error}`);
+        console.error(`Error during guard handling: ${error}`);
     }
 }
 
 function isUserSafe(guild, userId) {
-    const güvenliKullanıcılar = db.get(`güvenli_kullanıcılar_${guild.id}`) || [];
-    const güvenliRoller = db.get(`güvenli_roller_${guild.id}`) || [];
+    const safeUsers = db.get(`safe_users_${guild.id}`) || [];
+    const safeRoles = db.get(`safe_roles_${guild.id}`) || [];
     const member = guild.members.cache.get(userId);
 
-    if (güvenliKullanıcılar.includes(userId)) return true;
+    if (safeUsers.includes(userId)) return true;
 
     if (member && member.roles) {
-        for (const rolId of güvenliRoller) {
-            if (member.roles.cache.has(rolId)) return true;
+        for (const roleId of safeRoles) {
+            if (member.roles.cache.has(roleId)) return true;
         }
     }
 
     return false;
 }
 
+// GUARD EVENTS
+
 client.on('channelDelete', async (channel) => {
-    await handleGuardEvent(channel.guild, channel.guild.fetchAuditLogs({ type: AuditLogEvent.ChannelDelete }), 'kanal_silme', 'delete_channels', 'Çok fazla kanal silme');
+    await handleGuardEvent(channel.guild, channel.guild.fetchAuditLogs({ type: AuditLogEvent.ChannelDelete }), 'delete_channels', 'delete_channels', 'Deleting too many channels');
+});
+
+client.on('channelCreate', async (channel) => {
+    await handleGuardEvent(channel.guild, channel.guild.fetchAuditLogs({ type: AuditLogEvent.ChannelCreate }), 'create_channels', 'create_channels', 'Creating too many channels');
 });
 
 client.on('roleCreate', async (role) => {
-    await handleGuardEvent(role.guild, role.guild.fetchAuditLogs({ type: AuditLogEvent.RoleCreate }), 'rol_oluşturma', 'create_roles', 'Çok fazla rol oluşturma');
+    await handleGuardEvent(role.guild, role.guild.fetchAuditLogs({ type: AuditLogEvent.RoleCreate }), 'create_roles', 'create_roles', 'Creating too many roles');
 });
 
 client.on('roleDelete', async (role) => {
-    await handleGuardEvent(role.guild, role.guild.fetchAuditLogs({ type: AuditLogEvent.RoleDelete }), 'rol_silme', 'delete_roles', 'Çok fazla rol silme');
+    await handleGuardEvent(role.guild, role.guild.fetchAuditLogs({ type: AuditLogEvent.RoleDelete }), 'delete_roles', 'delete_roles', 'Deleting too many roles');
+});
+
+client.on('guildBanAdd', async (ban) => {
+    await handleGuardEvent(ban.guild, ban.guild.fetchAuditLogs({ type: AuditLogEvent.MemberBanAdd }), 'ban_members', 'ban_members', 'Banning too many members');
+});
+
+client.on('guildMemberRemove', async (member) => {
+    await handleGuardEvent(member.guild, member.guild.fetchAuditLogs({ type: AuditLogEvent.MemberKick }), 'kick_members', 'kick_members', 'Kicking too many members');
 });
 
 client.on('messageCreate', async (message) => {
     if (message.mentions.everyone && !message.author.bot) {
         const user = message.author;
         const guild = message.guild;
-        const dbKey = 'everyone_atma';
+        const dbKey = 'send_everyone';
         const limitKey = 'send_everyone';
-        const reason = 'Çok fazla everyone atma';
+        const reason = 'Mentioning everyone too many times';
 
         if (isUserSafe(guild, user.id)) return;
 
@@ -183,46 +203,33 @@ client.on('messageCreate', async (message) => {
         }
 
         const limit = config.limit[limitKey];
-
-        console.log(`Kullanıcı eylemi: ${userActions.count}, Limit: ${limit}`);
+        console.log(`User action: ${userActions.count}, Limit: ${limit}`);
 
         if (userActions.count >= limit) {
-            console.log("Limit aşıldı. Kullanıcı yasaklanıyor.");
+            console.log("Limit exceeded. Banning user...");
 
             try {
                 await guild.members.ban(user.id, { reason: reason });
-                console.log(`Kullanıcı ${user.id} başarıyla yasaklandı.`);
+                console.log(`User ${user.id} was successfully banned.`);
             } catch (error) {
-                console.error(`Kullanıcı ${user.id} yasaklanamadı: ${error}`);
+                console.error(`Failed to ban user ${user.id}: ${error}`);
             }
 
             const embed = new EmbedBuilder()
                 .setColor("Red")
-                .setTitle("Guard Sistemi Uyarısı")
-                .setDescription(`${user.tag}, ${reason} nedeniyle sunucudan yasaklandı.`);
+                .setTitle("Guard System Warning")
+                .setDescription(`${user.tag} has been banned for: ${reason}.`);
 
             try {
                 const owner = await guild.fetchOwner();
                 await owner.send({ embeds: [embed] });
             } catch (error) {
-                console.error(`Sunucu sahibine mesaj gönderilemedi: ${error}`);
+                console.error(`Could not send message to server owner: ${error}`);
             }
 
             db.delete(`${dbKey}_${guild.id}_${user.id}`);
         }
     }
-});
-
-client.on('channelCreate', async (channel) => {
-    await handleGuardEvent(channel.guild, channel.guild.fetchAuditLogs({ type: AuditLogEvent.ChannelCreate }), 'kanal_oluşturma', 'create_channels', 'Çok fazla kanal oluşturma');
-});
-
-client.on('guildBanAdd', async (ban) => {
-    await handleGuardEvent(ban.guild, ban.guild.fetchAuditLogs({ type: AuditLogEvent.MemberBanAdd }), 'üye_yasaklama', 'ban_members', 'Çok fazla üye yasaklama');
-});
-
-client.on('guildMemberRemove', async (member) => {
-    await handleGuardEvent(member.guild, member.guild.fetchAuditLogs({ type: AuditLogEvent.MemberKick }), 'üye_atma', 'kick_members', 'Çok fazla üye atma');
 });
 
 client.on('guildUpdate', async (oldGuild, newGuild) => {
@@ -231,18 +238,18 @@ client.on('guildUpdate', async (oldGuild, newGuild) => {
         const entry = auditLogs.entries.first();
         if (entry && entry.executor && !isUserSafe(newGuild, entry.executor.id)) {
             const user = entry.executor;
-            await newGuild.members.ban(user.id, { reason: 'Sunucu ayarlarını değiştirme girişimi' });
+            await newGuild.members.ban(user.id, { reason: 'Attempted to change server settings' });
 
             const embed = new EmbedBuilder()
                 .setColor("Red")
-                .setTitle("Guard Sistemi Uyarısı")
-                .setDescription(`${user.tag}, sunucu ayarlarını değiştirmeye çalıştığı için yasaklandı.`);
+                .setTitle("Guard System Warning")
+                .setDescription(`${user.tag} was banned for attempting to change server settings.`);
 
             const owner = await newGuild.fetchOwner();
             await owner.send({ embeds: [embed] });
         }
     } catch (error) {
-        console.error(`Sunucu güncelleme işlemi sırasında hata oluştu: ${error}`);
+        console.error(`Error during guild update handling: ${error}`);
     }
 });
 
@@ -250,35 +257,36 @@ client.on('guildMemberAdd', async (member) => {
     if (member.user.bot) {
         const auditLogs = await member.guild.fetchAuditLogs({ type: AuditLogEvent.BotAdd });
         const entry = auditLogs.entries.first();
-        
+
         if (entry && entry.target.id === member.user.id) {
             const user = entry.executor;
 
             if (!isUserSafe(member.guild, user.id)) {
                 try {
-                    await member.kick('Sunucuya bot ekledi');
-                    console.log(`Bot ${member.user.tag} başarıyla sunucudan atıldı çünkü ${user.tag} tarafından eklendi.`);
-                    
-                    await member.guild.members.ban(user.id, { reason: 'Bot ekleme' });
-                    console.log(`Kullanıcı ${user.id} başarıyla yasaklandı çünkü bot ekledi.`);
-                    
+                    await member.kick('Bot added to server');
+                    console.log(`Bot ${member.user.tag} was kicked because it was added by ${user.tag}.`);
+
+                    await member.guild.members.ban(user.id, { reason: 'Added a bot' });
+                    console.log(`User ${user.id} was banned for adding a bot.`);
+
                     const embed = new EmbedBuilder()
                         .setColor("Red")
-                        .setTitle("Guard Sistemi Uyarısı")
-                        .setDescription(`${user.tag}, bir bot eklediği için sunucudan yasaklandı.`);
-                    
+                        .setTitle("Guard System Warning")
+                        .setDescription(`${user.tag} was banned for adding a bot.`);
+
                     const owner = await member.guild.fetchOwner();
                     await owner.send({ embeds: [embed] });
                 } catch (error) {
-                    console.error(`Bot veya kullanıcıya işlem yapılamadı: ${error}`);
+                    console.error(`Could not take action against bot/user: ${error}`);
                 }
             } else {
-                console.log(`Güvenli kullanıcı ${user.tag} bir bot ekledi.`);
+                console.log(`Safe user ${user.tag} added a bot.`);
             }
         }
     }
 });
 
+// Voice Join Example (Optional)
 // const { joinVoiceChannel } = require('@discordjs/voice');
 // client.on('ready', () => {
 //   joinVoiceChannel({
@@ -294,17 +302,17 @@ client.once("ready", async () => {
         await rest.put(Routes.applicationCommands(client.user.id), {
             body: client.commands,
         });
-        console.log(`${client.user.tag} Aktif! 💕`);
+        console.log(`${client.user.tag} is now online! 💕`);
 
         client.guilds.cache.forEach(guild => {
             addToWhitelist(guild.id, client.user.id);
         });
     } catch (error) {
-        console.error(`Komutlar kaydedilirken hata oluştu: ${error}`);
+        console.error(`Error while registering commands: ${error}`);
     }
 });
 
 client.login(config.token)
     .catch((err) => {
-        console.error(`Discord API'ye bağlanırken hata oluştu: ${err}`);
+        console.error(`Error connecting to Discord API: ${err}`);
     });
